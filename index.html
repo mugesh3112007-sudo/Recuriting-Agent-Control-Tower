@@ -93,6 +93,7 @@
                             <span id="hdrEvents">EVENTS 0</span>
                             <span id="hdrUptime">UPTIME 00:00:00</span>
                             <span id="hdrState" class="text-green-400">● SYSTEM NOMINAL</span>
+                            <span id="hdrAI" class="text-gray-500" title="LLM agent runtime status">AI ● …</span>
                         </div>
                     </div>
                 </div>
@@ -121,6 +122,7 @@
                 <button class="tab-btn px-3 pb-2.5 pt-1 text-[13px] border-b-2 font-medium" data-tab="pipeline">Pipeline <span id="pipeCount" class="ml-1 px-1.5 py-0.5 text-[10px] rounded bg-gray-800 text-gray-400">0</span></button>
                 <button class="tab-btn px-3 pb-2.5 pt-1 text-[13px] border-b-2 font-medium" data-tab="hitl">HITL Queue <span id="hitlCount" class="ml-1 px-1.5 py-0.5 text-[10px] rounded bg-amber-600 text-white">0</span></button>
                 <button class="tab-btn px-3 pb-2.5 pt-1 text-[13px] border-b-2 font-medium" data-tab="registry">Registry</button>
+                <button class="tab-btn px-3 pb-2.5 pt-1 text-[13px] border-b-2 font-medium" data-tab="integrations">Integrations</button>
                 <button class="tab-btn px-3 pb-2.5 pt-1 text-[13px] border-b-2 font-medium" data-tab="analytics">Analytics</button>
                 <button class="tab-btn px-3 pb-2.5 pt-1 text-[13px] border-b-2 font-medium" data-tab="audit">Audit Log</button>
             </nav>
@@ -135,6 +137,7 @@
             <div id="view-pipeline" class="tab-content p-5 hidden"></div>
             <div id="view-hitl" class="tab-content p-5 hidden"></div>
             <div id="view-registry" class="tab-content p-5 hidden"></div>
+            <div id="view-integrations" class="tab-content p-5 hidden"></div>
             <div id="view-analytics" class="tab-content p-5 hidden"></div>
             <div id="view-audit" class="tab-content p-5 hidden"></div>
         </main>
@@ -151,6 +154,8 @@
     <script src="js/engine.js"></script>
     <script src="js/charts.js"></script>
     <script src="js/views.js"></script>
+    <script src="js/aiagent.js"></script>
+    <script src="js/integrations.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

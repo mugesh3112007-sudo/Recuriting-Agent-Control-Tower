@@ -12,6 +12,7 @@ const state = {
     candidates: seedCandidates(),
     exceptions: seedExceptions(),
     audit: seedAudit(),
+    integrations: seedIntegrations(),
     metrics: {
         discovered: 148, verified: 96, contacted: 71, responded: 38, shortlisted: 14,
         exceptionsRaised: 22, exceptionsResolved: 19, tasksTotal: 340, tasksFailed: 7,
@@ -371,7 +372,7 @@ async function progressCandidate(c) {
 
                 if (!c.outreach.state || c.outreach.state === 'not_started') {
                     await sleep(rand(1200, 1900));
-                    buildOutreach(c, agent);
+                    await buildOutreach(c, agent);
                     renderIf('pipeline');
                 }
 
@@ -524,17 +525,29 @@ function computeVerification(c, agent) {
     reason(c, agent.name, `Scored ${score}/100 (confidence ${confidence.toFixed(2)}) · ${flags.length ? flags.join('; ') : 'no blockers'}`);
 }
 
-function buildOutreach(c, agent) {
+/* Build the outreach draft. Uses the real LLM agent when the runtime is
+   live; falls back to the scripted template when offline. */
+async function buildOutreach(c, agent) {
     const req = getReq(c.reqId);
+    let subject = null, body = null, live = false;
+    if (typeof AIAgent !== 'undefined' && AIAgent.online !== false) {
+        try {
+            const d = await AIAgent.draftOutreach(c, req);
+            subject = d.subject; body = d.body; live = true;
+            log('AI_DRAFT', c.reqId, `${c.id} personalised draft generated · model ${AIAgent.model} · ${AIAgent.lastMs}ms`, `${agent.name} · LLM`, 'ai');
+        } catch { /* offline → template below */ }
+    }
     c.outreach = {
         state: 'draft',
-        subject: `${req?.urgency === 'P0' ? 'P0 role' : 'Role'}: ${req?.title || 'a role'} — your ${c.skills[0]} work stood out`,
-        body: `Hi ${c.name.split(' ')[0]} — your work on ${c.skills.slice(0, 2).join(' and ')} at ${c.company} is closely aligned with what we're building. ` +
+        subject: subject || `${req?.urgency === 'P0' ? 'P0 role' : 'Role'}: ${req?.title || 'a role'} — your ${c.skills[0]} work stood out`,
+        body: body || `Hi ${c.name.split(' ')[0]} — your work on ${c.skills.slice(0, 2).join(' and ')} at ${c.company} is closely aligned with what we're building. ` +
               `We're hiring a ${req?.title || 'senior engineer'} and your ${c.experience.toLowerCase()} background maps directly. ` +
               `Open to a 20-minute conversation this week?`,
         approvedBy: null, sentAt: null,
     };
-    reason(c, agent.name, `Draft generated · tone=peer-to-peer · anchors: ${c.skills.slice(0, 2).join(', ')} @ ${c.company}`);
+    reason(c, agent.name, live
+        ? `LLM draft generated (${AIAgent.model} · ${AIAgent.lastMs}ms) · anchors: ${c.skills.slice(0, 2).join(', ')} @ ${c.company}`
+        : `Draft generated · tone=peer-to-peer · anchors: ${c.skills.slice(0, 2).join(', ')} @ ${c.company}`);
 }
 
 /* ---------- Candidate creation (sourcing) ---------- */

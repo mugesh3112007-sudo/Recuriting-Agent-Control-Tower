@@ -83,7 +83,7 @@ function renderActiveTab() {
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) return;
     const views = {
         dashboard: renderDashboard, pipeline: renderPipeline, hitl: renderHitl,
-        registry: renderRegistry, analytics: renderAnalytics, audit: renderAudit,
+        registry: renderRegistry, integrations: renderIntegrations, analytics: renderAnalytics, audit: renderAudit,
     };
     const el = $('#view-' + state.ui.tab);
     if (el && views[state.ui.tab]) {
@@ -535,9 +535,13 @@ function exceptionCard(e) {
     } else if (e.type === 'DRAFT_REVIEW') {
         payload = `
         <div class="mb-3 rounded-lg border border-gray-700/70 bg-gray-950/60 overflow-hidden">
-            <div class="px-3 py-2 border-b border-gray-800 text-[11px] text-gray-400 flex justify-between">
-                <span>drafted by <b class="text-blue-300">${esc(e.detail.agent || agentName(e.agentId))}</b></span>
-                <span class="tabular">score ${e.detail.score}</span>
+            <div class="px-3 py-2 border-b border-gray-800 text-[11px] text-gray-400 flex justify-between items-center gap-2">
+                <span>drafted by <b class="text-blue-300">${esc(e.detail.agent || agentName(e.agentId))}</b> · score ${e.detail.score}</span>
+                <button class="px-2 py-1 text-[10.5px] rounded border border-violet-500/40 text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 transition flex items-center gap-1 ${e._aiBusy === 'draft' ? 'opacity-60 pointer-events-none' : ''}"
+                    onclick="aiRegenerate('${e.id}')">
+                    ${e._aiBusy === 'draft'
+                        ? '<span class="w-2.5 h-2.5 border-2 border-violet-300 border-t-transparent rounded-full animate-spin"></span> Generating…'
+                        : '<i data-lucide="sparkles" class="w-3 h-3"></i> Regenerate with AI'}</button>
             </div>
             <div class="px-3 py-2">
                 <div class="text-[12px] font-semibold mb-1.5">Subject: ${esc(e.detail.subject || '')}</div>
@@ -566,7 +570,18 @@ function exceptionCard(e) {
         <div class="p-4">
             <p class="text-[12px] text-gray-300 mb-3 leading-relaxed">${esc(e.reason)}</p>
             ${payload}
+            ${e._aiBusy === 'rec' ? aiBusyBar('Governance Copilot analysing this exception with the LLM…') : ''}
+            ${e._ai && e._ai.decision ? aiRecBanner(e) : ''}
+            ${e._aiBusy === 'reply' ? aiBusyBar('Drafting a suggested reply for reference…') : ''}
+            ${e._aiReply ? aiReplyBanner(e) : ''}
             <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-800">
+                <button class="px-3 py-2 rounded-md text-[12px] font-semibold transition flex items-center justify-center gap-1.5 border border-violet-500/40 text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 ${e._aiBusy ? 'opacity-60 pointer-events-none' : ''}"
+                    onclick="aiRecommend('${e.id}')">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI Recommend</button>
+                ${e.type === 'SENTIMENT' ? `
+                <button class="px-3 py-2 rounded-md text-[12px] font-medium transition flex items-center justify-center gap-1.5 border border-sky-500/40 text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 ${e._aiBusy ? 'opacity-60 pointer-events-none' : ''}"
+                    onclick="aiSuggestReply('${e.id}')">
+                    <i data-lucide="message-circle-reply" class="w-3.5 h-3.5"></i> Suggest reply</button>` : ''}
                 <button class="flex-1 min-w-[120px] px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-md text-[12px] font-semibold transition flex items-center justify-center gap-1.5"
                     onclick="decideException('${e.id}','APPROVED')">
                     <i data-lucide="check" class="w-3.5 h-3.5"></i> Approve &amp; Proceed</button>
@@ -605,6 +620,8 @@ function renderRegistry() {
                 onclick="state.ui.registryFilter='${x}';renderAll()">${x === 'ALL' ? 'All' : x === 'AI' ? 'AI Agents' : 'Humans'}</button>`).join('')}
         </div>
     </div>
+
+    ${aiRuntimeStrip()}
 
     <div class="glass border border-gray-800 rounded-xl overflow-x-auto">
         <table class="w-full text-[12px] min-w-[1080px]">
@@ -808,6 +825,8 @@ const ACTION_COLORS = {
     ERROR: 'text-red-300 bg-red-600/15 border-red-600/40', RECOVERED: 'text-emerald-300 bg-emerald-600/10 border-emerald-600/30',
     ASSIGNED: 'text-gray-300 bg-gray-600/15 border-gray-600', SYSTEM: 'text-gray-400 bg-gray-700/30 border-gray-700',
     OFFLINE: 'text-gray-400 bg-gray-700/30 border-gray-700', POLICY: 'text-fuchsia-300 bg-fuchsia-500/10 border-fuchsia-500/30',
+    AI_DRAFT: 'text-violet-300 bg-violet-500/10 border-violet-500/40', AI_RECOMMEND: 'text-violet-300 bg-violet-500/10 border-violet-500/40',
+    INTEGRATION: 'text-teal-300 bg-teal-500/10 border-teal-500/30',
 };
 function actionBadge(action) {
     return `<span class="px-1.5 py-0.5 text-[9.5px] font-bold font-mono border rounded ${ACTION_COLORS[action] || ACTION_COLORS.SYSTEM}">${action}</span>`;
@@ -931,6 +950,7 @@ function renderDrawer() {
                 <div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">Skills</div>
                 <div class="flex flex-wrap gap-1.5">${c.skills.map(s => `<span class="text-[11px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/25">${esc(s)}</span>`).join('')}</div>
             </div>
+            ${drawerAiCard(c, req)}
             ${c.verification ? `
             <div class="border border-gray-800 rounded-lg p-3">
                 <div class="flex justify-between text-[11px] mb-1.5"><span class="text-gray-500">Verification</span>
@@ -1040,6 +1060,43 @@ function renderDrawer() {
         <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-md text-[12px]" onclick="switchTab('hitl');closeDrawer()">Open in queue →</button>
     </div>` : ''}`;
     lucide.createIcons();
+}
+
+/* ---------- Drawer AI copilot card ---------- */
+function drawerAiCard(c, req) {
+    const busy = c._aiBusy;
+    const spin = '<span class="w-3 h-3 border-2 border-violet-200 border-t-transparent rounded-full animate-spin"></span>';
+    return `
+    <div class="border border-violet-500/30 bg-violet-500/[0.05] rounded-lg p-3">
+        <div class="flex items-center gap-2 mb-2">
+            <i data-lucide="sparkles" class="w-4 h-4 text-violet-300"></i>
+            <span class="text-[10.5px] uppercase tracking-wider text-violet-300 font-semibold">AI copilot</span>
+            <span class="ml-auto text-[10px] font-mono ${AIAgent.online ? 'text-emerald-400' : 'text-gray-500'}">${AIAgent.online ? '● ' + esc(AIAgent.model || 'live') : 'offline · templates only'}</span>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+            <button class="px-2.5 py-1.5 text-[11px] rounded-md border border-violet-500/40 text-violet-200 bg-violet-500/10 hover:bg-violet-500/20 transition flex items-center gap-1.5 ${busy ? 'opacity-60 pointer-events-none' : ''}"
+                onclick="aiDrawerDraft()">
+                ${busy === 'draft' ? spin + 'Generating…' : `<i data-lucide="sparkles" class="w-3 h-3"></i> ${c.outreach?.body ? 'Rewrite outreach' : 'Draft outreach'}`}</button>
+            <button class="px-2.5 py-1.5 text-[11px] rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 transition flex items-center gap-1.5 ${busy ? 'opacity-60 pointer-events-none' : ''}"
+                onclick="aiDrawerNote()">
+                ${busy === 'note' ? spin + 'Summarising…' : '<i data-lucide="file-search" class="w-3 h-3"></i> Screening summary'}</button>
+        </div>
+        ${c._aiDraft ? `
+        <div class="mt-2.5 bg-gray-950/70 border border-gray-800 rounded-lg p-2.5">
+            <div class="text-[11.5px] font-semibold mb-1">${esc(c._aiDraft.subject)}</div>
+            <p class="text-[11.5px] text-gray-400 leading-relaxed whitespace-pre-line">${esc(c._aiDraft.body)}</p>
+            <div class="flex gap-1.5 mt-2">
+                <button class="px-2.5 py-1 bg-violet-600 hover:bg-violet-500 rounded text-[11px] font-semibold transition" onclick="aiUseDraft()">Use as outreach draft</button>
+                <button class="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-[11px] transition" onclick="aiCopyDrawer('draft')">Copy</button>
+            </div>
+        </div>` : ''}
+        ${c._aiNote ? `
+        <div class="mt-2.5 bg-gray-950/70 border border-gray-800 rounded-lg p-2.5">
+            <div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">LLM screening summary</div>
+            <p class="text-[11.5px] text-gray-300 leading-relaxed">${esc(c._aiNote)}</p>
+            <button class="mt-2 px-2.5 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-[11px] transition" onclick="aiCopyDrawer('note')">Copy</button>
+        </div>` : ''}
+    </div>`;
 }
 
 /* ================================================================

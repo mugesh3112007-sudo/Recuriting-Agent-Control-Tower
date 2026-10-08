@@ -267,6 +267,43 @@ function seedAudit() {
     }));
 }
 
+/* ---------- ATS / CRM / communications integrations ---------- */
+function seedIntegrations() {
+    const now = Date.now();
+    return [
+        { id: 'gh',     name: 'Greenhouse', cat: 'ATS', icon: 'briefcase', status: 'CONNECTED',
+          desc: 'Job ingest + candidate write-back', endpoint: 'api.greenhouse.io/v1/boards/acme · webhook /hooks/gh',
+          lastSync: now - 180e3, records: 148, latency: 210, auth: 'OAuth2' },
+        { id: 'ashby',  name: 'Ashby', cat: 'ATS', icon: 'layout-grid', status: 'CONNECTED',
+          desc: 'Sourcing sandbox · 2 boards synced', endpoint: 'api.ashbyhq.com/posting-api/acme · key ****9f2',
+          lastSync: now - 600e3, records: 62, latency: 180, auth: 'API key' },
+        { id: 'lever',  name: 'Lever', cat: 'ATS', icon: 'git-branch', status: 'DEGRADED',
+          desc: 'Legacy req source · rate-limited', endpoint: 'api.lever.co/v0/postings · 429 ×6 in last hour',
+          lastSync: now - 2700e3, records: 37, latency: 1400, auth: 'OAuth2' },
+        { id: 'crm',    name: 'Salesforce Talent CRM', cat: 'CRM', icon: 'contact', status: 'CONNECTED',
+          desc: 'Nurture campaigns + talent pools', endpoint: 'acme.my.salesforce.com/services/data/v60/talent',
+          lastSync: now - 900e3, records: 214, latency: 340, auth: 'OAuth2' },
+        { id: 'slack',  name: 'Slack', cat: 'COMMS', icon: 'message-square', status: 'CONNECTED',
+          desc: '#recruiting-alerts · HITL paging', endpoint: 'hooks.slack.com/services/T0****/B0**** · events: app_mention',
+          lastSync: now - 45e3, records: 320, latency: 90, auth: 'Bot token' },
+        { id: 'gmail',  name: 'Gmail · SMTP', cat: 'COMMS', icon: 'mail', status: 'CONNECTED',
+          desc: 'Outbound outreach mailbox · Echo + Blitz', endpoint: 'smtp.gmail.com:587 · outreach@acme.io',
+          lastSync: now - 120e3, records: 89, latency: 150, auth: 'OAuth2' },
+        { id: 'gcal',   name: 'Google Calendar', cat: 'SCHEDULING', icon: 'calendar', status: 'CONNECTED',
+          desc: 'Panel availability + invite dispatch', endpoint: 'googleapis.com/calendar/v3 · calendars/panel-interviews',
+          lastSync: now - 60e3, records: 24, latency: 200, auth: 'OAuth2' },
+        { id: 'zoom',   name: 'Zoom', cat: 'SCHEDULING', icon: 'video', status: 'CONNECTED',
+          desc: 'Meeting provisioning for booked slots', endpoint: 'api.zoom.us/v2/users/me/meetings',
+          lastSync: now - 300e3, records: 11, latency: 260, auth: 'JWT' },
+        { id: 'li',     name: 'LinkedIn Recruiter', cat: 'SOURCING', icon: 'users', status: 'ERROR',
+          desc: 'Sourcing API · token expired', endpoint: 'api.linkedin.com/v2/ · 401 invalid_token (rotated 2h ago)',
+          lastSync: now - 7200e3, records: 57, latency: 0, auth: 'OAuth2 · expired — reconnect' },
+        { id: 'ghub',   name: 'GitHub', cat: 'SOURCING', icon: 'terminal', status: 'CONNECTED',
+          desc: 'Repo activity signals for verification', endpoint: 'api.github.com/search/users · rate 4811/5000',
+          lastSync: now - 240e3, records: 76, latency: 300, auth: 'PAT (read)' },
+    ];
+}
+
 /* ---------- Simulation profile pool ---------- */
 const PROFILE_POOL = [
     { name: 'Hannah Wolfe',   headline: 'Senior Engineer · Streaming Infra', company: 'Confluent',   location: 'London',      skills: ['Kafka', 'Flink', 'Go'],          experience: '8 yrs · ex-Confluent, ex-Bloomberg', base: 88 },

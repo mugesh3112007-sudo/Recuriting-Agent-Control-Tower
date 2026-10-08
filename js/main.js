@@ -24,11 +24,15 @@ window.commitRule = commitRule;
 window.updateWeight = updateWeight;
 window.state = state;
 window.SIM = SIM;
+window.renderIntegrations = typeof renderIntegrations !== 'undefined' ? renderIntegrations : null;
 
 /* ---- Boot ---- */
 function boot() {
     lucide.createIcons();
     renderAll();
+
+    /* Probe the LLM agent runtime (server.py → OmniRoute) */
+    if (typeof AIAgent !== 'undefined') AIAgent.health();
 
     /* Header controls */
     $('#simBtn')?.addEventListener('click', () => {
@@ -74,6 +78,7 @@ function boot() {
         else if (e.key === 'a' || e.key === 'A') switchTab('analytics');
         else if (e.key === 'l' || e.key === 'L') switchTab('audit');
         else if (e.key === 'r' || e.key === 'R') switchTab('registry');
+        else if (e.key === 'i' || e.key === 'I') switchTab('integrations');
         else if (e.key === 'd' || e.key === 'D') switchTab('pipeline');
         else if (e.key === 'm' || e.key === 'M') switchTab('dashboard');
         else if (e.key === 'Escape') { closeDrawer(); closeModal(); }
@@ -83,7 +88,7 @@ function boot() {
     metricsTick();
 
     console.log('%c🎯 Recruiting Agent Control Tower · SW-06', 'font-size:14px;color:#38bdf8;font-weight:600');
-    console.log('%cShortcuts: Space=run/stop · P=pause · S=speed · H=hitl · A=analytics · L=audit · R=registry · D=pipeline · M=dashboard · Esc=close', 'color:#6b7280');
+    console.log('%cShortcuts: Space=run/stop · P=pause · S=speed · H=hitl · A=analytics · L=audit · R=registry · I=integrations · D=pipeline · M=dashboard · Esc=close', 'color:#6b7280');
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
