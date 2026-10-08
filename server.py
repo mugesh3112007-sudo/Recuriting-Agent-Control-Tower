@@ -19,6 +19,7 @@ Env overrides:
 
 import json
 import os
+import signal
 import sys
 import time
 import urllib.error
@@ -90,22 +91,44 @@ class Handler(SimpleHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
 
     def _json(self, obj, status=200):
-        body = json.dumps(obj).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self._cors()
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = json.dumps(obj).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def do_OPTIONS(self):
-        self.send_response(204)
-        self._cors()
-        self.end_headers()
+        try:
+            self.send_response(204)
+            self._cors()
+            self.end_headers()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def do_HEAD(self):
+        path = self.path.split("?")[0]
+        if path.startswith("/api/agent/"):
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self._cors()
+                self.end_headers()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        else:
+            try:
+                super().do_HEAD()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     def do_GET(self):
         path = self.path.split("?")[0]
@@ -114,7 +137,10 @@ class Handler(SimpleHTTPRequestHandler):
         elif path == "/api/agent/model":
             self._json({"model": AGENT_MODEL, "gateway": OMNI_BASE})
         else:
-            super().do_GET()
+            try:
+                super().do_GET()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     def do_POST(self):
         path = self.path.split("?")[0]
@@ -159,11 +185,37 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as exc:
             self._json({"ok": False, "error": str(exc)[:300]}, 502)
 
+    def log_message(self, fmt, *args):
+        # Clean non-noisy log
+        sys.stderr.write("[%s] %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
+
+
+def main():
+    ThreadingHTTPServer.daemon_threads = True
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+
+    def shutdown_handler(signum, frame):
+        sys.stderr.write("\nShutting down server gracefully...\n")
+        server.server_close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+
+    health = agent_health()
+    print("=" * 60)
+    print(" Recruiting Agent Control Tower — Backend Server (SW-06)")
+    print(" Live URL    : http://127.0.0.1:%d/" % PORT)
+    print(" LLM Gateway : %s  (Model: %s)" % (OMNI_BASE, AGENT_MODEL))
+    print(" Agent Health: %s" % ("LIVE" if health["ok"] else "OFFLINE — %s" % health.get("error")))
+    print("=" * 60)
+    sys.stdout.flush()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
 
 if __name__ == "__main__":
-    health = agent_health()
-    print("Recruiting Agent Control Tower  ->  http://127.0.0.1:%d/" % PORT)
-    print("LLM gateway  ->  %s  (model: %s)" % (OMNI_BASE, AGENT_MODEL))
-    print("agent status ->  %s" % ("LIVE" if health["ok"] else "OFFLINE — %s" % health.get("error")))
-    sys.stdout.flush()
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    main()
